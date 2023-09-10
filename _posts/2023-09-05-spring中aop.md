@@ -38,7 +38,7 @@ Spring AOP中默认只使用了前者,即注解部分的功能,借用Aspectj的�
 #### `@EnableAspectJAutoProxy`
 `@EnableAspectJAutoProxy`导入一个`AspectJAutoProxyRegistrar`
 ,参考 ![调用顺序](../images/spring-aop/callers-of-auto-config-register.png "调用顺序"),`AspectJAutoProxyRegistrar`会向bean factory注册`AnnotationAwareAspectJAutoProxyCreator`的对象,此对象的`#findCandidateAdvisors()`方法会扫描`@Aspectj`相关注解和`Advisor`, 其也是`InstantiationAwareBeanPostProcessor`的子类,
-所以对象的代理创建会在`#AbstractAutoProxyCreator#postProcessAfterInitialization`和`AbstractAutoProxyCreator#postProcessBeforeInstantiation`中被调用(注意一个是实例化前,一个是初始化后)
+所以对象的代理创建会在`AbstractAutoProxyCreator#postProcessAfterInitialization`和`AbstractAutoProxyCreator#postProcessBeforeInstantiation`中被调用(注意一个是实例化前,一个是初始化后)
 
 我们看下`#postProcessAfterInitialization`方法的过程
 ```
@@ -84,6 +84,8 @@ Spring AOP中默认只使用了前者,即注解部分的功能,借用Aspectj的�
 
 		// Create proxy if we have advice.
 		//获取当前符合bean的advisor,创建代理
+		//此方法会拉去当前所有的Advisor对象,包括@Aspectj注解的bean和Advisor子类bean
+		//拉取所有Advisor后,判定切入点是否包含当前bean
 		Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
 		if (specificInterceptors != DO_NOT_PROXY) {
 			this.advisedBeans.put(cacheKey, Boolean.TRUE);
@@ -144,8 +146,7 @@ Spring AOP中默认只使用了前者,即注解部分的功能,借用Aspectj的�
 	}
 ```
 
-
-此对象的`#findCandidateAdvisors()`方法会扫描上下文中的存在`@Aspecj`注解和`Advisor`实例.
+在上面提到的`getAdvicesAndAdvisorsForBean`方法中,会调用到`AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors()`方法会扫描上下文中的存在`@Aspectj`注解和`Advisor`实例.
 
 ```java
         //AnnotationAwareAspectJAutoProxyCreator#findCandidateAdvisors
@@ -162,3 +163,6 @@ Spring AOP中默认只使用了前者,即注解部分的功能,借用Aspectj的�
 		return advisors;
 	}
 ```
+
+### 总结
+Spring AOP通过注入一个`AnnotationAwareAspectJAutoProxyCreator`对象,通过此对象的`BeanPostProcessor#postProcessAfterInitialization`方法处理每个bean,处理过程会获取当前所有的Advisor声明,逐个判定是否应该作用于某个bean,是则返回代理对象.
